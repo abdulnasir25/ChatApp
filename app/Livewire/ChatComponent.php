@@ -4,10 +4,15 @@ namespace App\Livewire;
 
 use Livewire\Component;
 use App\Models\User;
+use App\Models\Message;
 
 class ChatComponent extends Component
 {
     public $user;
+    public $senderId;
+    public $receiverId;
+    public $message = '';
+    public $messages = [];
 
     public function render()
     {
@@ -16,7 +21,45 @@ class ChatComponent extends Component
 
     public function mount($user_id)
     {
-        // dd($user_id);
+        $this->senderId = auth()->user()->id; // logged user id
+        $this->receiverId = $user_id; // to whome you send message
+
+        $messages = Message::where(function($query) {
+            $query->where('sender_id', $this->senderId)
+                ->where('receiver_id', $this->receiverId);
+        })->orWhere(function($query) {
+            $query->where('sender_id', $this->receiverId)
+                ->where('receiver_id', $this->senderId);
+        })
+        ->with('sender:id,name', 'receiver:id,name')
+        ->get();
+
+        foreach ($messages as $message) {
+            $this->appendChatMessage($message);
+        }
+
         $this->user = User::whereId($user_id)->first();
+    }
+
+    public function sendMessage()
+    {
+        $chatMessage = new Message();
+
+        $chatMessage->sender_id = $this->senderId;
+        $chatMessage->receiver_id = $this->receiverId;
+        $chatMessage->message = $this->message;
+        $chatMessage->save();
+
+        $this->message = '';
+    }
+
+    public function appendChatMessage($message)
+    {
+        $this->messages[] = [
+            'id' => $message->id,
+            'message' => $message->message,
+            'sender' => $message->sender->name,
+            'receiver' => $message->receiver->name,
+        ];
     }
 }
