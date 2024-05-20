@@ -2,9 +2,11 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
 use App\Models\User;
 use App\Models\Message;
+use Livewire\Component;
+use Livewire\Attributes\On;
+use App\Events\MessageSendEvent;
 
 class ChatComponent extends Component
 {
@@ -50,6 +52,10 @@ class ChatComponent extends Component
         $chatMessage->message = $this->message;
         $chatMessage->save();
 
+        $this->appendChatMessage($chatMessage);
+
+        broadcast(new MessageSendEvent($chatMessage))->toOthers();
+
         $this->message = '';
     }
 
@@ -61,5 +67,18 @@ class ChatComponent extends Component
             'sender' => $message->sender->name,
             'receiver' => $message->receiver->name,
         ];
+    }
+
+    // listener to listen the message
+    // yaha par senderId esly define ki hai, k es id k thorugh message ko listen kya jata hai, jo k logged user hai, awr wo sender hai.
+    #[On('echo-private:chat-channel.{senderId},MessageSendEvent')]
+    public function listenForMessage($event)
+    {
+        // convert the array to obj, by fetching the first record.
+        $chatMessage = Message::whereId($event['message']['id'])
+                        ->with('sender:id,name', 'receiver:id,name')
+                        ->first();
+
+        $this->appendChatMessage($chatMessage);
     }
 }
